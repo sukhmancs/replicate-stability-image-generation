@@ -16,6 +16,7 @@ class MyClient(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True        
         super().__init__(command_prefix='!', intents=intents)
+        self.command_in_progress = False  # flag to check if a command is in progress
 
     async def on_ready(self):
         """
@@ -126,7 +127,12 @@ async def generate_image(ctx, *, args):
     args: str
         A single string containing the prompt and guidance scale.
     """
+    if client.command_in_progress:
+        await ctx.send('A command is already in progress. Please wait for the current command to finish.')
+        return
+    
     try:
+        client.command_in_progress = True
         args = args.strip('"') # remove the quotes
         prompt, guidance_scale = args.split('",') # split the prompt and guidance scale based on the comma
         guidance_scale = int(guidance_scale) 
@@ -179,11 +185,18 @@ async def generate_image(ctx, *, args):
             # not the time took to generate the image
             end_time = time.time()
             time_elapsed = end_time - start_time
+
+            # throw an execution of the code if it is taking too long
+            if time_elapsed > 60:
+                raise Exception("The image generation is taking too long. This is likely due to the model being overloaded. Please try again later.")                            
             await ctx.send(f"Time elapsed: {time_elapsed:.2f} seconds")
         except Exception as e:
-            await ctx.send(f"An error occurred: {str(e)}")
-
+            await ctx.send(f"An error occurred: {str(e)}")        
     except ValueError:
         await ctx.send('Please provide the correct format. Type "!help" for more information.')
+    
+    finally:
+        # reset the flag
+        client.command_in_progress = False
 
 client.run(os.getenv('DISCORD_TOKEN'))
